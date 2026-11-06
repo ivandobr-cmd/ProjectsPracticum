@@ -1,0 +1,294 @@
+1. Введение
+1.1. Роли Windows Server (кратко)
+
+Windows Server позволяет настроить следующие роли:
+
+    Файловая служба и служба хранилища — общий доступ к файлам и папкам по сети.
+
+    Веб-сервер (IIS) — размещение веб-сайтов и приложений.
+
+    DHCP-сервер — централизованная выдача IP-адресов и параметров сети.
+
+    DNS-сервер — обеспечение работы DNS в сети компании.
+
+    Hyper-V — среда виртуализации.
+
+    Active Directory Domain Services (AD DS) — службы каталогов; позволяет преобразовать сервер в контроллер домена.
+
+1.2. Что такое AD DS
+
+AD DS — это роль Windows Server, предоставляющая функции Active Directory: централизованное управление пользователями, компьютерами, группами, политиками безопасности. Контроллер домена (DC) хранит базу данных каталога и обслуживает запросы аутентификации.
+2. Установка роли AD DS и создание домена (Шаг 1)
+
+Выполняется на первой виртуальной машине WinServer-DC.
+
+    Откройте PowerShell от имени администратора.
+
+    Установите роль AD DS и инструменты управления:
+    powershell
+
+Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools
+
+Создайте новый лес и домен int.local.host. Команда запросит пароль для режима восстановления (DSRM) — задайте надежный пароль и сохраните его:
+powershell
+
+Install-ADDSForest -DomainName "int.local.host" -InstallDns
+
+    После завершения сервер перезагрузится. Войдите в систему как INT\Administrator.
+
+3. Создание структуры OU, групп и пользователей (Шаг 2)
+
+После перезагрузки откройте PowerShell от имени администратора и выполните скрипт, создающий подразделения (OU), группы и пользователей (аналогично структуре OpenLDAP).
+3.1. Скрипт создания OU, групп и пользователей
+powershell
+
+# Создание OU
+New-ADOrganizationalUnit -Name "Disabled Accounts" -Path "DC=int,DC=local,DC=host"
+New-ADOrganizationalUnit -Name "Users" -Path "DC=int,DC=local,DC=host"
+New-ADOrganizationalUnit -Name "Groups" -Path "DC=int,DC=local,DC=host"
+New-ADOrganizationalUnit -Name "ADMIN" -Path "OU=Groups,DC=int,DC=local,DC=host"
+New-ADOrganizationalUnit -Name "INFRA" -Path "OU=Groups,DC=int,DC=local,DC=host"
+New-ADOrganizationalUnit -Name "ORG" -Path "OU=Groups,DC=int,DC=local,DC=host"
+New-ADOrganizationalUnit -Name "RES" -Path "OU=Groups,DC=int,DC=local,DC=host"
+New-ADOrganizationalUnit -Name "Service Accounts" -Path "OU=Users,DC=int,DC=local,DC=host"
+
+# Создание групп
+New-ADGroup -Name "SG-ADM-T1-SRV-LINUX-ADMINS" -GroupScope Global -GroupCategory Security -Path "OU=ADMIN,OU=Groups,DC=int,DC=local,DC=host"
+New-ADGroup -Name "SG-ADM-T0-DIRECTORY-ADMINS" -GroupScope Global -GroupCategory Security -Path "OU=ADMIN,OU=Groups,DC=int,DC=local,DC=host"
+New-ADGroup -Name "SG-ADM-T1-SRV-ANSIBLE-ADMINS" -GroupScope Global -GroupCategory Security -Path "OU=INFRA,OU=Groups,DC=int,DC=local,DC=host"
+New-ADGroup -Name "SG-ORG-IT-Users" -GroupScope Global -GroupCategory Security -Path "OU=ORG,OU=Groups,DC=int,DC=local,DC=host"
+New-ADGroup -Name "SG-RES-SHARE-hq_dep_it-RW" -GroupScope Global -GroupCategory Security -Path "OU=RES,OU=Groups,DC=int,DC=local,DC=host"
+
+# Создание пользователей
+New-ADUser -Name "Anton Zhukov" -SamAccountName "ajukov" -UserPrincipalName "ajukov@int.local.host" -Path "OU=Users,DC=int,DC=local,DC=host" -AccountPassword (ConvertTo-SecureString "YandexPracticum2026" -AsPlainText -Force) -Enabled $true
+New-ADUser -Name "svc_ansible" -SamAccountName "svc_ansible" -UserPrincipalName "svc_ansible@int.local.host" -Path "OU=Service Accounts,OU=Users,DC=int,DC=local,DC=host" -AccountPassword (ConvertTo-SecureString "a42i0_oncaq-39z" -AsPlainText -Force) -Enabled $true
+
+# Добавление в группы
+Add-ADGroupMember -Identity "SG-ADM-T1-SRV-LINUX-ADMINS" -Members "ajukov"
+Add-ADGroupMember -Identity "SG-ORG-IT-Users" -Members "ajukov"
+
+3.2. Проверка структуры
+
+Откройте оснастку Active Directory Users and Computers (dsa.msc) и убедитесь, что структура выглядит так:
+text
+
+int.local.host
+├── Disabled Accounts
+├── Users
+│   └── Service Accounts (svc_ansible)
+├── Groups
+│   ├── ADMIN (SG-ADM-T1..., SG-ADM-T0...)
+│   ├── INFRA (SG-ADM-T1-SRV-ANSIBLE...)
+│   ├── ORG (SG-ORG-IT-Users)
+│   └── RES (SG-RES-SHARE-hq_dep_it-RW)
+└── Users (системный контейнер, не трогаем)
+
+3.3. Исправление ошибок: удаление неправильно созданных OU
+
+Если OU ADMIN, INFRA, ORG, RES оказались в корне домена (а не внутри Groups), удалите их и создайте заново.
+
+Способ 1 — точечное удаление:
+powershell
+
+Remove-ADOrganizationalUnit -Identity "OU=ADMIN,DC=int,DC=local,DC=host" -Recursive -Confirm:$false
+Remove-ADOrganizationalUnit -Identity "OU=INFRA,DC=int,DC=local,DC=host" -Recursive -Confirm:$false
+Remove-ADOrganizationalUnit -Identity "OU=ORG,DC=int,DC=local,DC=host" -Recursive -Confirm:$false
+Remove-ADOrganizationalUnit -Identity "OU=RES,DC=int,DC=local,DC=host" -Recursive -Confirm:$false
+
+New-ADOrganizationalUnit -Name "ADMIN" -Path "OU=Groups,DC=int,DC=local,DC=host"
+New-ADOrganizationalUnit -Name "INFRA" -Path "OU=Groups,DC=int,DC=local,DC=host"
+New-ADOrganizationalUnit -Name "ORG" -Path "OU=Groups,DC=int,DC=local,DC=host"
+New-ADOrganizationalUnit -Name "RES" -Path "OU=Groups,DC=int,DC=local,DC=host"
+
+Способ 2 — массовая очистка всех OU в корне домена (если нужно снести всё лишнее):
+powershell
+
+Get-ADOrganizationalUnit -Filter 'Name -like "*"' -SearchBase "DC=int,DC=local,DC=host" | ForEach-Object {
+    try {
+        Set-ADObject -Identity $_.DistinguishedName -ProtectedFromAccidentalDeletion $false
+        Remove-ADOrganizationalUnit -Identity $_.DistinguishedName -Recursive -Confirm:$false
+        Write-Host "Удалено: $($_.Name)" -ForegroundColor Green
+    } catch {
+        Write-Host "Не удалось удалить: $($_.Name)" -ForegroundColor Yellow
+    }
+}
+
+    Важно: скрипт удаляет только OU, находящиеся непосредственно в корне домена, и не затрагивает системные контейнеры (Domain Controllers, Users и т.п.).
+
+Проверка:
+powershell
+
+Get-ADOrganizationalUnit -Filter *
+
+Должно остаться пусто (или только системные).
+4. Настройка групповых политик (GPO) (Шаг 3)
+
+Откройте Group Policy Management (gpmc.msc). Редактируется политика Default Domain Policy.
+4.1. Политика паролей и блокировки
+
+Computer Configuration → Policies → Windows Settings → Security Settings → Account Policies
+
+    Password Policy:
+
+        Minimum password length = 8
+
+        Password must meet complexity requirements = Enabled
+
+        Maximum password age = 180 дней
+
+        Enforce password history = 3
+
+    Account Lockout Policy:
+
+        Account lockout threshold = 5
+
+        Account lockout duration = 15 минут
+
+        Reset account lockout counter after = 15 минут
+
+4.2. Запрет гостевой учетной записи
+
+Computer Configuration → Policies → Windows Settings → Security Settings → Local Policies → Security Options
+
+    Accounts: Guest account status = Disabled
+
+4.3. Запрет интерактивного входа для локальных пользователей
+
+Computer Configuration → Policies → Windows Settings → Security Settings → Local Policies → User Rights Assignment
+
+    Deny log on locally: добавьте группу Guests и Users (или конкретные локальные учетные записи, которые нужно ограничить).
+
+4.4. Доступ по RDP только для Domain Admins и RDP_Users
+
+В том же разделе User Rights Assignment:
+
+    Allow log on through Remote Desktop Services: оставьте только Domain Admins и RDP_Users (создайте группу RDP_Users заранее, если её нет).
+
+4.5. Включение аудита
+
+Computer Configuration → Policies → Windows Settings → Security Settings → Advanced Audit Policy Configuration → System Audit Policies
+Включите аудит для:
+
+    Logon/Logoff (Success, Failure)
+
+    Account Management (Success, Failure)
+
+    Policy Change (Success, Failure)
+
+    Аудит доступа к файлам настраивается на самом файловом сервере: свойства папки → Security → Advanced → Auditing → добавьте пользователей и тип доступа.
+
+4.6. Применение политик
+powershell
+
+gpupdate /force
+
+5. Подключение второй ВМ к домену (Шаг 4)
+
+На второй виртуальной машине WinServer-Client:
+
+    Убедитесь, что DNS указывает на IP-адрес контроллера домена (172.16.0.1).
+    Путь: Параметры → Сеть и Интернет → Ethernet → Настройка параметров адаптера → Свойства → IP версии 4 (TCP/IPv4) → Использовать следующие адреса DNS-серверов.
+
+    Откройте sysdm.cpl → вкладка Имя компьютера → Изменить → выберите Является членом домена → введите int.local.host.
+
+    Введите логин и пароль доменного администратора.
+
+    Перезагрузите ВМ.
+
+    Войдите под созданной доменной учетной записью (например, INT\ajukov).
+
+5.1. Разрешение RDP для доменных пользователей (при необходимости)
+
+Чтобы все пользователи домена могли подключаться удаленно, на клиентской машине выполните:
+cmd
+
+net localgroup "Remote Desktop Users" "Domain Users" /add
+
+Проверка:
+cmd
+
+net localgroup "Remote Desktop Users"
+
+Аналогично можно поступить на любой машине, вводимой в домен.
+6. Сетевые порты для Active Directory (Шаг 5)
+
+Таблица для отчета:
+Источник	Назначение	Протокол/Порт	Назначение
+Клиенты (сегменты)	Контроллер домена	TCP/UDP 53	DNS
+Клиенты	Контроллер домена	TCP 88	Kerberos
+Клиенты	Контроллер домена	TCP/UDP 389	LDAP
+Клиенты	Контроллер домена	TCP 445	SMB (для SYSVOL)
+Клиенты	Контроллер домена	TCP 135, 49152+	RPC
+Клиенты	Контроллер домена	UDP 123	NTP
+Контроллер домена	DNS-сервер	UDP 53	Перенаправление DNS
+7. Дополнительные сведения
+7.1. Инструменты управления
+
+    dsa.msc — Active Directory Users and Computers (пользователи и компьютеры).
+
+    gpmc.msc — Group Policy Management (управление групповыми политиками).
+
+7.2. Стандартные контейнеры AD
+
+    Builtin — встроенные группы безопасности (Администраторы, Пользователи, Читатели журналов событий и др.).
+
+    Computers — компьютеры, добавленные в домен.
+
+    Domain Controllers — учётные записи контроллеров домена.
+
+    Users — контейнер по умолчанию для учётных записей пользователей (содержит встроенную учетную запись Администратор и ряд групп).
+
+7.3. Создание пользователей (альтернативные способы)
+
+Через командную строку (dsadd):
+cmd
+
+dsadd user "cn=Петр Петров,ou=Marketing,dc=darkstore,dc=local" -fn Петр -ln Петров -pwd Qazwsx+123
+
+Через PowerShell (New-ADUser):
+powershell
+
+New-ADUser -Name "Сергей Сидоров" -GivenName "Сергей" -Surname "Сидоров" -SamAccountName "s.sidorov" -UserPrincipalName "s.sidorov@darkstore.local" -Path "OU=Marketing,DC=darkstore,DC=local" -AccountPassword (Read-Host -AsSecureString "Input Password") -Enabled $true
+
+7.4. Политики по умолчанию
+
+После создания домена автоматически создаются две политики:
+
+    Default Domain Policy — привязана к домену.
+
+    Default Domain Controllers Policy — привязана к OU Domain Controllers.
+
+7.5. Обновление групповых политик
+powershell
+
+gpupdate /force
+
+
+
+
+
+
+servermanager
+контроллер
+- диспетчер серверов
+сервер 
+- изменить имя DC(domain controller) 
+- перезагрузка 
+- net user Administrator P@ssw0rd(для ВМ) 
+- servermanager, управление, добавить роль 
+- утановка ролей 
+- выбираем сервер 
+- добавить Active Directory Domain Services 
+- повысить роль до DC - новый лес <test.local> 
+- dns и пароль 
+- имя
+
+клиент
+- Определить IP-адрес контроллера домена командой ipconfig
+- Указать этот адрес в качестве адреса DNS-сервера на хосте.
+Для этого откройте меню Пуск → Параметры → Сеть и Интернет → Ethernet → Настройка параметров адаптера. Нажмите правой кнопкой на сетевом адаптере, выберите Свойства. В открывшемся окне два раза щёлкните по строке Internet Protocol Version (TCP/IPv4). В следующем окне впишите IP-адрес контроллера домена в разделе Использовать следующие адреса DNS-серверов
+- Изменение имени компьютера или домена переключите режим рабочей группы, в котором сейчас работает win-server, выбрав опцию Является членом домена (вводить домен/имя пользователя + пароль)
+- Проверить доступность контроллера домена можно командой ping test.local
+- net localgroup "Remote Desktop Users" "Domain Users" /add - все пользователи домена могли подключаться к нему удалённо. Также вы можете убедиться, что настройка сделана, выполнив команду net localgroup "Remote Desktop Users"
+
+
