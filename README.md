@@ -4,6 +4,12 @@ Hi! My name is Ivan, and I am an Information Security Specialist (Penetration Te
 
 This repository contains my practical projects completed during the Yandex Practicum course. It demonstrates my hands-on skills in web application pentesting, infrastructure hardening, incident investigation, security auditing (FSTEC-21 compliance), and automation.
 
+
+## Featured Projects
+incident-investigation-and-traffic-analysis
+fstec-21-compliance-and-remediation
+pentest-web-app-owasp-juice-shop
+
 ## Project Categories
 
 ### Web Application Pentesting & Security
