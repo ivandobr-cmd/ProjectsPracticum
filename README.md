@@ -31,6 +31,3 @@ This repository contains my practical projects completed during the Yandex Pract
 ### Audit & Compliance
 *   **Security Audit:** Infrastructure audit, configuration review, and development of a corporate security standard.
 *   **FSTEC-21:** Compliance assessment and remediation planning.
-
-## Note on File Formats
-The reports are currently provided in `.docx` format. You can download them for a detailed review of the methodologies, screenshots, and findings.
