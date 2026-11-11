@@ -7,7 +7,7 @@ This repository contains my practical projects completed during the Yandex Pract
 
 ## Featured Projects
 
-*   **[Incident Investigation (SOC)]()**: Analyzed network traffic and logs to detect phishing, hidden XMRig cryptominers, and data exfiltration attempts, documenting the full attack timeline.
+*   **[Incident Investigation (SOC)](https://github.com/ivandobr-cmd/ProjectsPracticum/blob/main/incident-investigation-and-traffic-analysis.pdf)**: Analyzed network traffic and logs to detect phishing, hidden XMRig cryptominers, and data exfiltration attempts, documenting the full attack timeline.
 *   **[FSTEC-21 Compliance Audit](https://github.com/ivandobr-cmd/ProjectsPracticum/blob/main/fstec-21-compliance-and-remediation-plan.pdf)**: Audited a simulated infrastructure against FSTEC-21 requirements, identified critical misconfigurations, and created a step-by-step remediation plan.
 *   **[Web App Pentest (OWASP Juice Shop)]()**: Exploited SQLi, XSS, and IDOR vulnerabilities, and deployed a WAF (BunkerWeb) that successfully blocked 100% of test attacks.
 
