@@ -6,9 +6,9 @@ This repository contains my practical projects completed during the Yandex Pract
 
 
 ## Featured Projects
-incident-investigation-and-traffic-analysis
-fstec-21-compliance-and-remediation
-pentest-web-app-owasp-juice-shop
+*    incident-investigation-and-traffic-analysis
+*    fstec-21-compliance-and-remediation
+*    pentest-web-app-owasp-juice-shop
 
 ## Project Categories
 
